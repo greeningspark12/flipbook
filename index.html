@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Flipbook Pro 3.1</title>
+  <script src="https://code.jquery.com/jquery-1.9.1.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/turn.js/3/turn.min.js"></script>
+  <style>
+    body {
+      background: #ccc;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #flipbook {
+      width: 800px;
+      height: 500px;
+      position: relative;
+      transition: transform 0.3s ease;
+    }
+
+    #flipbook .page {
+      width: 400px;
+      height: 500px;
+      background: white;
+      box-shadow: 0 0 15px rgba(0,0,0,0.5);
+      position: absolute;
+    }
+
+    #flipbook img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    /* Тонкая вертикальная разделительная линия */
+    #flipbook::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      width: 2px;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.1);
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    .nav {
+      margin: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .nav button {
+      background-color: #fff;
+      border: 1px solid #999;
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 20px;
+      margin: 5px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .nav button:hover {
+      background-color: #eee;
+      transform: scale(1.05);
+    }
+
+    #soundToggle.sound-off::after {
+      content: "🔇";
+    }
+    #soundToggle.sound-on::after {
+      content: "🔊";
+    }
+
+    #magnifier {
+      position: absolute;
+      width: 300px;
+      height: 300px;
+      border: 2px solid #666;
+      overflow: hidden;
+      display: none;
+      pointer-events: none;
+      z-index: 9999;
+      background: white;
+    }
+
+    #magnifier img {
+      position: absolute;
+      transform: scale(2.5);
+    }
+
+    @media (max-width: 900px) {
+      #flipbook {
+        transform: scale(0.8);
+        transform-origin: top center;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="nav">
+    <button id="first">⏮</button>
+    <button id="prev">←</button>
+    <button id="next">→</button>
+    <button id="last">⏭</button>
+    <button id="zoomIn">➕</button>
+    <button id="zoomOut">➖</button>
+    <button id="toggleZoom">🔍</button>
+    <button id="soundToggle" class="sound-on"></button>
+  </div>
+
+  <div id="flipbook">
+    <div class="page"><img src="page1.jpg" alt="1"></div>
+    <div class="page"><img src="page2.jpg" alt="2"></div>
+    <div class="page"><img src="page3.jpg" alt="3"></div>
+    <div class="page"><img src="page4.jpg" alt="4"></div>
+    <div class="page"><img src="page5.jpg" alt="5"></div>
+    <div class="page"><img src="page6.jpg" alt="6"></div>
+    <div class="page"><img src="page7.jpg" alt="7"></div>
+  </div>
+
+  <div id="magnifier"></div>
+  <audio id="flipSound" preload="auto"></audio>
+
+  <script>
+    $(document).ready(function () {
+      const flipSound = document.getElementById('flipSound');
+      const flipSounds = ['flip1.mp3', 'flip2.mp3', 'flip3.mp3'];
+      let soundEnabled = true;
+      let magnifyMode = false;
+      let scale = 1;
+      const maxScale = 1.3;
+      const minScale = 0.6;
+
+      function getRandomSound() {
+        return flipSounds[Math.floor(Math.random() * flipSounds.length)];
+      }
+
+      function applyZoom() {
+        $('#flipbook').css({
+          'transform': `scale(${scale})`,
+          'transform-origin': 'top center'
+        });
+      }
+
+      $('#zoomIn').click(() => {
+        if (scale < maxScale) {
+          scale = Math.min(scale + 0.1, maxScale);
+          applyZoom();
+        }
+      });
+
+      $('#zoomOut').click(() => {
+        if (scale > minScale) {
+          scale = Math.max(scale - 0.1, minScale);
+          applyZoom();
+        }
+      });
+
+      $('#soundToggle').click(() => {
+        soundEnabled = !soundEnabled;
+        $('#soundToggle').toggleClass('sound-on sound-off');
+      });
+
+      $('#toggleZoom').click(() => {
+        magnifyMode = !magnifyMode;
+        if (magnifyMode) {
+          $('#flipbook .page').css('cursor', 'none');
+          $('#flipbook .page').on('mousemove.magnifier', function (e) {
+            const offset = $(this).offset();
+            const x = e.pageX - offset.left;
+            const y = e.pageY - offset.top;
+
+            $('#magnifier').css({
+              top: e.pageY - 150 + 'px',
+              left: e.pageX - 150 + 'px',
+              display: 'block'
+            });
+
+            const $img = $(this).find('img');
+            $('#magnifier').html(
+              `<img src="${$img.attr('src')}" style="left: -${x * 2.5 - 150}px; top: -${y * 2.5 - 150}px;">`
+            );
+          });
+          $('#flipbook .page').on('mouseleave.magnifier', () => {
+            $('#magnifier').hide().empty();
+          });
+        } else {
+          $('#flipbook .page').off('.magnifier');
+          $('#magnifier').hide().empty();
+          $('#flipbook .page').css('cursor', 'default');
+        }
+      });
+
+      $('#flipbook').turn({
+        width: 800,
+        height: 500,
+        autoCenter: true,
+        elevation: 50,
+        display: 'double',
+        gradients: true,
+        pages: 7,
+        when: {
+          turning: function () {
+            if (soundEnabled) {
+              flipSound.src = getRandomSound();
+              flipSound.pause();
+              flipSound.currentTime = 0;
+              flipSound.play().catch(() => {});
+            }
+          }
+        }
+      });
+
+      $('#prev').click(() => $('#flipbook').turn('previous'));
+      $('#next').click(() => $('#flipbook').turn('next'));
+      $('#first').click(() => $('#flipbook').turn('page', 1));
+      $('#last').click(() => $('#flipbook').turn('page', $('#flipbook').turn('pages')));
+    });
+  </script>
+
+</body>
+</html>
